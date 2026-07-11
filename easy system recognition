@@ -1,0 +1,44 @@
+import sys
+import time
+
+user = input("System: Identify yourself: ")
+if user == "YOUR_NAME":
+    print("System: Welcome YOUR_NAME")
+
+    while True:
+        try:
+            request = int(input("Sistema: ¿What do you want to do? "))
+        except ValueError:
+            print("System: Insert a valid number")
+            input()
+            continue
+            
+        if request == 1:
+            print("System: YOUR_REQUEST")
+            input()
+            break
+        elif request == 2:
+            print("System: YOUR REQUEST")
+            input()
+            break
+        elif request == 3:
+            print("System: YOUR_REQUEST")
+            input()
+            break
+        elif request == 4:
+            print("System: YOUR_REQUEST")
+            input()
+            break
+        elif request == 5:
+            print("System: YOUR_REQUEST")
+            input()
+            break
+        else:
+            print("System: Invalid action")
+
+    sys.exit()
+
+else:
+    print("System: Access denied")
+    time.sleep(1)
+    sys.exit()
