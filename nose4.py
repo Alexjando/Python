@@ -1,18 +1,18 @@
 import random
 import string
 
-def generar_contraseña(longitud=12):
-    caracteres = string.ascii_letters + string.digits + string.punctuation
-    return ''.join(random.choice(caracteres) for _ in range(longitud))
+def create_password(longitud=12):
+    characters = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(random.choice(character) for _ in range(longitud))
 
-print("Generador de Contraseñas")
+print("Password Generetion")
 
 while True:
     try:
-        longitud = int(input("Ingrese la longitud de la contraseña: "))
+        longitud = int(input("Please choose the password length: "))
         break
     except ValueError:
-        print("Sistema: Debes ingresar un número válido")
+        print("System: You have to insert a valid number")
 
-print("Contraseña generada:", generar_contraseña(longitud))
+print("Password generated:", generate_password(longitud))
 input()
