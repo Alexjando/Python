@@ -38,7 +38,7 @@ def buscar_productos(producto, cantidad=20):
         """
     })
 
-    driver.get("https://www.mercadolibre.com.pe")
+    driver.get("https://www.mercadolibre.com.YOUR_COUNTRY")
 
     print("Título de la página:", driver.title)
 
@@ -78,7 +78,7 @@ def buscar_productos(producto, cantidad=20):
         )
         print("✅ Resultados encontrados:", len(resultados))
     except:
-        print("⚠️ No se encontraron resultados con XPATH.")
+        print("⚠️ No se encontraron resultados.")
         driver.quit()
         return []
 
@@ -93,7 +93,6 @@ def buscar_productos(producto, cantidad=20):
         except:
             precio = None
 
-        # Vendedor con fallback adicional
         try:
             vendedor = item.find_element(By.XPATH,
                 ".//span[contains(@class,'ui-search-official-store-label') or contains(@class,'ui-search-item__group__seller')]"
@@ -106,7 +105,6 @@ def buscar_productos(producto, cantidad=20):
             except:
                 vendedor = "No especificado"
 
-        # URL flexible
         try:
             url = item.find_element(By.XPATH, ".//a[contains(@href,'mercadolibre.com.pe')]").get_attribute("href")
         except:
@@ -129,7 +127,7 @@ def buscar_productos(producto, cantidad=20):
 
     if openpyxl is None:
         archivo_csv = "resultados.csv"
-        encabezados = ["FechaHora", "Producto", "Precio", "Vendedor", "URL"]
+        encabezados = ["Fecha/Hora", "Producto", "Precio", "Vendedor", "URL"]
         escribir_encabezados = not os.path.exists(archivo_csv)
 
         with open(archivo_csv, mode="a", encoding="utf-8", newline="") as f:
@@ -156,7 +154,6 @@ def buscar_productos(producto, cantidad=20):
     for prod in productos_ordenados:
         ws.append([fecha_hora, prod[0], prod[1], prod[2], prod[3]])
 
-    # Crear gráfico solo si hay suficientes datos
     if len(productos_ordenados) >= 2:
         chart = BarChart()
         chart.title = "Comparación de precios"
@@ -175,7 +172,6 @@ def buscar_productos(producto, cantidad=20):
     return productos_ordenados
 
 
-# Solicitar al usuario el producto a buscar
 print("=" * 60)
 print("🔍 BUSCADOR DE PRODUCTOS EN MERCADO LIBRE PERÚ")
 print("=" * 60)
