@@ -1,0 +1,210 @@
+import os
+import time, random
+from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import csv
+
+try:
+    import openpyxl
+    from openpyxl.chart import BarChart, Reference
+except ImportError:
+    openpyxl = None
+
+
+def buscar_productos(producto, cantidad=20):
+    options = Options()
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--incognito")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                     "AppleWebKit/537.36 (KHTML, like Gecko) "
+                     "Chrome/114.0.0.0 Safari/537.36")
+
+    driver = webdriver.Chrome(options=options)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": """
+            Object.defineProperty(navigator, 'webdriver', {
+              get: () => undefined
+            })
+        """
+    })
+
+    driver.get("https://www.mercadolibre.com.pe")
+
+    print("Título de la página:", driver.title)
+
+    time.sleep(4)
+
+    try:
+        aceptar_btn = WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Aceptar cookies')]"))
+        )
+        aceptar_btn.click()
+        print("✅ Cookies aceptadas automáticamente")
+    except:
+        print("No apareció el banner de cookies")
+
+    try:
+        search_box = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input.nav-search-input"))
+        )
+    except:
+        print("⚠️ No se encontró el campo de búsqueda.")
+        driver.quit()
+        return []
+
+    time.sleep(random.randint(2, 4))
+    search_box.send_keys(producto)
+
+    time.sleep(random.randint(2, 4))
+    search_box.send_keys(Keys.RETURN)
+
+    time.sleep(random.randint(2, 4))
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(random.randint(2, 4))
+
+    try:
+        resultados = WebDriverWait(driver, 20).until(
+            EC.presence_of_all_elements_located((By.XPATH, "//li[contains(@class,'ui-search-layout__item')]"))
+        )
+        print("✅ Resultados encontrados:", len(resultados))
+    except:
+        print("⚠️ No se encontraron resultados con XPATH.")
+        driver.quit()
+        return []
+
+    productos = []
+    for item in resultados[:cantidad]:
+        try:
+            # Precio flexible
+            precio = item.find_element(By.XPATH,
+                ".//span[contains(@class,'price-tag-fraction') or contains(@class,'andes-money-amount__fraction')]"
+            ).text
+            precio = int(precio.replace(".", "").replace(",", ""))
+        except:
+            precio = None
+
+        # Vendedor con fallback adicional
+        try:
+            vendedor = item.find_element(By.XPATH,
+                ".//span[contains(@class,'ui-search-official-store-label') or contains(@class,'ui-search-item__group__seller')]"
+            ).text
+        except:
+            try:
+                vendedor = item.find_element(By.XPATH,
+                    ".//p[contains(@class,'ui-search-official-store-label') or contains(@class,'ui-search-item__group__seller')]"
+                ).text
+            except:
+                vendedor = "No especificado"
+
+        # URL flexible
+        try:
+            url = item.find_element(By.XPATH, ".//a[contains(@href,'mercadolibre.com.pe')]").get_attribute("href")
+        except:
+            url = "No disponible"
+
+        if precio:
+            productos.append((producto, precio, vendedor, url))
+
+        time.sleep(random.randint(2, 4))
+
+    driver.delete_all_cookies()
+    driver.quit()
+
+    if not productos:
+        print("⚠️ No se obtuvieron productos válidos.")
+        return []
+
+    productos_ordenados = sorted(productos, key=lambda x: x[1])
+    fecha_hora = datetime.now().strftime("%m-%d %H:%M")
+
+    if openpyxl is None:
+        archivo_csv = "resultados.csv"
+        encabezados = ["FechaHora", "Producto", "Precio", "Vendedor", "URL"]
+        escribir_encabezados = not os.path.exists(archivo_csv)
+
+        with open(archivo_csv, mode="a", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            if escribir_encabezados:
+                writer.writerow(encabezados)
+            for prod in productos_ordenados:
+                writer.writerow([fecha_hora, prod[0], prod[1], prod[2], prod[3]])
+
+        os.startfile(archivo_csv)
+        return productos_ordenados
+
+    archivo_excel = "resultados.xlsx"
+    if os.path.exists(archivo_excel):
+        wb = openpyxl.load_workbook(archivo_excel)
+    else:
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+    hoja_nombre = producto[:31]
+    ws = wb.create_sheet(title=hoja_nombre)
+
+    ws.append(["FechaHora", "Producto", "Precio", "Vendedor", "URL"])
+    for prod in productos_ordenados:
+        ws.append([fecha_hora, prod[0], prod[1], prod[2], prod[3]])
+
+    # Crear gráfico solo si hay suficientes datos
+    if len(productos_ordenados) >= 2:
+        chart = BarChart()
+        chart.title = "Comparación de precios"
+        chart.x_axis.title = "Producto"
+        chart.y_axis.title = "Precio (S/)"
+        max_row = min(len(productos_ordenados) + 1, 50)  # Limitar a 50 filas máximo
+        data = Reference(ws, min_col=3, min_row=1, max_row=max_row)
+        cats = Reference(ws, min_col=2, min_row=2, max_row=max_row)
+        chart.add_data(data, titles_from_data=True)
+        chart.set_categories(cats)
+        ws.add_chart(chart, "G2")
+
+    wb.save(archivo_excel)
+    os.startfile(archivo_excel)
+
+    return productos_ordenados
+
+
+# Solicitar al usuario el producto a buscar
+print("=" * 60)
+print("🔍 BUSCADOR DE PRODUCTOS EN MERCADO LIBRE PERÚ")
+print("=" * 60)
+producto_buscar = input("\n¿Qué producto deseas buscar? ")
+
+if not producto_buscar.strip():
+    print("❌ Error: Debes ingresar un producto para buscar.")
+else:
+    cantidad_resultados = input("\n¿Cuántos resultados deseas? (por defecto 20): ").strip()
+    
+    try:
+        cantidad = int(cantidad_resultados) if cantidad_resultados else 20
+    except ValueError:
+        cantidad = 20
+        print("⚠️ Valor inválido, se usarán 20 resultados por defecto.")
+    
+    print(f"\n🔎 Buscando '{producto_buscar}' (mostrando {cantidad} resultados)...\n")
+    
+    resultados = buscar_productos(producto_buscar, cantidad=cantidad)
+    
+    if resultados:
+        print(f"\n✅ Se encontraron {len(resultados)} productos ordenados por precio:")
+        print("-" * 80)
+        for i, r in enumerate(resultados, 1):
+            print(f"{i}. Producto: {r[0]} | Precio: S/{r[1]} | Vendedor: {r[2]}")
+        print("-" * 80)
+        print("\n📊 Los resultados se han guardado en 'resultados.xlsx'")
+    else:
+        print("\n❌ No se obtuvieron resultados.")
+
+time.sleep(random.randint(2, 3))
+input("\nPresiona Enter para salir...")
